@@ -34,7 +34,7 @@
       min-height: 100vh;
       padding: 16px;
       user-select: none;
-      touch-action: pan-y; /* Отключаем горизонтальный скролл для свайпов */
+      overflow: hidden; /* Предотвращаем скролл страницы при свайпах */
     }
 
     .app-container {
@@ -68,15 +68,31 @@
       margin-top: -8px;
     }
 
-    /* Контейнер для карточки с 3D-эффектом */
+    /* Контейнер для карточки */
     .card-container {
       perspective: 1000px;
       width: 100%;
       height: 480px;
-      cursor: pointer;
       position: relative;
     }
 
+    /* Обертка для свайпа (отвечает за перемещение и поворот) */
+    .drag-wrapper {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      touch-action: none; /* Отключаем браузерные жесты */
+      cursor: grab;
+      transition: transform 0.3s ease;
+      z-index: 2;
+    }
+    .drag-wrapper:active {
+      cursor: grabbing;
+    }
+
+    /* Сама карточка (отвечает за переворот) */
     .card {
       width: 100%;
       height: 100%;
@@ -85,6 +101,7 @@
       transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
       border-radius: var(--border-radius);
       box-shadow: var(--shadow);
+      background-color: var(--card-bg);
     }
 
     .card.is-flipped {
@@ -126,23 +143,44 @@
       color: var(--text-muted);
     }
 
-    .card-back p {
-      margin-bottom: 12px;
-      line-height: 1.4;
-      font-size: 14px;
-    }
-
+    .card-back p { margin-bottom: 12px; line-height: 1.4; font-size: 14px; }
     .card-back .definition { font-weight: 600; color: var(--text-main); }
     .card-back .translation { font-weight: 700; color: var(--primary-color); font-size: 16px; }
     .card-back .context-box {
-      background: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      border-left: 4px solid var(--primary-color);
-      margin-top: 8px;
-      width: 100%;
+      background: #f8f9fa; padding: 12px; border-radius: 8px;
+      border-left: 4px solid var(--primary-color); margin-top: 8px; width: 100%;
     }
     .card-back .context-en { font-style: italic; color: #444; font-size: 13px; }
+
+    /* Оверлеи для свайпов (как в Тиндере) */
+    .overlay {
+      position: absolute;
+      top: 20px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 20px;
+      text-transform: uppercase;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+    }
+    .overlay.know {
+      right: 20px;
+      color: var(--success-color);
+      border: 3px solid var(--success-color);
+      background: rgba(46, 204, 113, 0.1);
+      transform: rotate(15deg);
+    }
+    .overlay.dont-know {
+      left: 20px;
+      color: var(--danger-color);
+      border: 3px solid var(--danger-color);
+      background: rgba(231, 76, 60, 0.1);
+      transform: rotate(-15deg);
+    }
 
     /* Кнопки управления */
     .controls {
@@ -176,31 +214,19 @@
 
     /* Экран завершения */
     .completion-screen {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(255,255,255,0.98);
       backdrop-filter: blur(5px);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      border-radius: var(--border-radius);
-      z-index: 10;
-      text-align: center;
-      padding: 24px;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      border-radius: var(--border-radius); z-index: 100; text-align: center; padding: 24px;
       display: none;
     }
     .completion-screen h2 { font-size: 24px; margin-bottom: 16px; color: var(--success-color); }
     .completion-screen p { margin-bottom: 24px; color: var(--text-muted); }
     .completion-screen button {
-      background-color: var(--primary-color);
-      color: white;
-      padding: 14px 28px;
-      font-size: 16px;
-      width: auto;
+      background-color: var(--primary-color); color: white; padding: 14px 28px; font-size: 16px; width: auto;
     }
 
-    /* Скрываем скроллбар */
     .card-back::-webkit-scrollbar { width: 4px; }
     .card-back::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
   </style>
@@ -208,37 +234,41 @@
 <body>
 
   <div class="app-container">
-    <!-- Прогресс -->
     <div class="progress-container">
       <div class="progress-bar" id="progressBar"></div>
     </div>
     <div class="progress-text" id="progressText">0 / 50</div>
     
-    <!-- Карточка -->
     <div class="card-container" id="cardContainer">
-      <div class="card" id="card">
-        <div class="card-front">
-          <h2 id="keyWord">Word</h2>
-          <p class="hint">Нажмите, чтобы перевернуть</p>
-        </div>
-        <div class="card-back">
-          <p class="definition" id="definition"></p>
-          <p class="translation" id="translation"></p>
-          <div class="context-box">
-            <p class="context-en" id="context"></p>
+      <!-- Оверлеи для свайпов -->
+      <div class="overlay know" id="overlayKnow">ЗНАЮ</div>
+      <div class="overlay dont-know" id="overlayDontKnow">НЕ ЗНАЮ</div>
+      
+      <!-- Обертка для перетаскивания -->
+      <div class="drag-wrapper" id="dragWrapper">
+        <!-- Карточка (отвечает за переворот) -->
+        <div class="card" id="card">
+          <div class="card-front">
+            <h2 id="keyWord">Word</h2>
+            <p class="hint">Нажмите, чтобы перевернуть</p>
+          </div>
+          <div class="card-back">
+            <p class="definition" id="definition"></p>
+            <p class="translation" id="translation"></p>
+            <div class="context-box">
+              <p class="context-en" id="context"></p>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Кнопки -->
     <div class="controls" id="controls">
       <button id="dontKnowBtn" class="danger">❌ Не знаю</button>
       <button id="flipBtn" class="neutral">🔄</button>
       <button id="knowBtn" class="success">✅ Знаю</button>
     </div>
 
-    <!-- Экран завершения -->
     <div class="completion-screen" id="completionScreen">
       <h2>🎉 Отлично!</h2>
       <p>Вы выучили все слова в этой сессии!</p>
@@ -247,7 +277,6 @@
   </div>
 
   <script>
-    // --- ВАШИ ДАННЫЕ (50 слов) ---
     const glossaryData = [
       { key: "assess", definition: "to judge or decide the amount, value, quality, or importance of something (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
       { key: "progression", definition: "the process of developing or moving gradually towards a more advanced state (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
@@ -301,13 +330,14 @@
       { key: "field", definition: "a region or space in which a particular effect is present (Cambridge)", context: "The network predicts a displacement field to align the moving image with the fixed image.", translation: "Сеть предсказывает поле смещений, чтобы выровнять движущееся изображение с фиксированным." }
     ];
 
-    // --- ЛОГИКА ПРИЛОЖЕНИЯ ---
-    let studyQueue = []; // Очередь карточек для изучения
-    let knownCount = 0;  // Счетчик выученных слов
+    // --- ЛОГИКА ---
+    let studyQueue = [];
+    let knownCount = 0;
     let currentCard = null;
     let isFlipped = false;
 
-    // DOM элементы
+    // DOM
+    const dragWrapper = document.getElementById('dragWrapper');
     const card = document.getElementById('card');
     const keyWordEl = document.getElementById('keyWord');
     const definitionEl = document.getElementById('definition');
@@ -317,11 +347,12 @@
     const progressText = document.getElementById('progressText');
     const completionScreen = document.getElementById('completionScreen');
     const controls = document.getElementById('controls');
+    const overlayKnow = document.getElementById('overlayKnow');
+    const overlayDontKnow = document.getElementById('overlayDontKnow');
 
-    // Инициализация / Сброс
+    // Инициализация
     function initSession() {
-      studyQueue = [...glossaryData]; // Копируем все слова
-      // Перемешиваем очередь
+      studyQueue = [...glossaryData];
       for (let i = studyQueue.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [studyQueue[i], studyQueue[j]] = [studyQueue[j], studyQueue[i]];
@@ -336,31 +367,36 @@
     // Загрузка следующей карточки
     function loadNextCard() {
       if (studyQueue.length === 0) {
-        // Все выучено!
         completionScreen.style.display = 'flex';
         controls.style.display = 'none';
         return;
       }
 
-      // Сбрасываем переворот
-      if (isFlipped) {
-        card.classList.remove('is-flipped');
-        isFlipped = false;
-      }
+      // Мгновенный сброс без анимации
+      card.style.transition = 'none';
+      card.classList.remove('is-flipped');
+      isFlipped = false;
+      
+      dragWrapper.style.transition = 'none';
+      dragWrapper.style.transform = 'translate(0px, 0px) rotate(0deg)';
+      overlayKnow.style.opacity = 0;
+      overlayDontKnow.style.opacity = 0;
 
-      // Берем первую карточку из очереди
-      currentCard = studyQueue[0]; // Не удаляем сразу, удалим при нажатии "Знаю"
+      currentCard = studyQueue[0];
 
-      // Небольшая задержка для анимации возврата
+      // Небольшая задержка перед сменой текста
       setTimeout(() => {
         keyWordEl.textContent = currentCard.key;
         definitionEl.textContent = currentCard.definition;
         translationEl.textContent = currentCard.translation;
         contextEl.textContent = currentCard.context;
-      }, 150);
+        
+        // Возвращаем анимации
+        card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1)';
+        dragWrapper.style.transition = 'transform 0.3s ease';
+      }, 50);
     }
 
-    // Обновление прогресса
     function updateProgress() {
       const total = glossaryData.length;
       const percent = (knownCount / total) * 100;
@@ -368,46 +404,120 @@
       progressText.textContent = `${knownCount} / ${total}`;
     }
 
-    // Действие: Знаю (Свайп вправо или кнопка)
     function handleKnow() {
       if (studyQueue.length === 0) return;
-      
-      // Удаляем текущую карточку из очереди (она выучена)
       studyQueue.shift(); 
       knownCount++;
       updateProgress();
       loadNextCard();
     }
 
-    // Действие: Не знаю (Свайп влево или кнопка)
     function handleDontKnow() {
       if (studyQueue.length === 0) return;
-      
-      // Перемещаем текущую карточку в конец очереди
       const cardToRepeat = studyQueue.shift();
       studyQueue.push(cardToRepeat);
       loadNextCard();
     }
 
-    // Переворот карточки
-    card.addEventListener('click', () => {
-      isFlipped = !isFlipped;
-      card.classList.toggle('is-flipped');
+    // --- СВАЙПЫ (Pointer Events) ---
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let isTap = true;
+
+    dragWrapper.addEventListener('pointerdown', (e) => {
+      if (studyQueue.length === 0) return;
+      isDragging = true;
+      isTap = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragWrapper.style.transition = 'none';
+      dragWrapper.setPointerCapture(e.pointerId);
     });
 
-    // Обработчики кнопок
+    dragWrapper.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        isTap = false;
+      }
+
+      // Визуальное перемещение и поворот
+      dragWrapper.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(${deltaX * 0.05}deg)`;
+
+      // Появление оверлеев
+      const opacityKnow = Math.max(0, Math.min(1, deltaX / 100));
+      const opacityDontKnow = Math.max(0, Math.min(1, -deltaX / 100));
+      overlayKnow.style.opacity = opacityKnow;
+      overlayDontKnow.style.opacity = opacityDontKnow;
+    });
+
+    dragWrapper.addEventListener('pointerup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      const deltaX = e.clientX - startX;
+
+      // Если это был клик (а не свайп) — переворачиваем карточку
+      if (isTap) {
+        isFlipped = !isFlipped;
+        card.classList.toggle('is-flipped');
+        dragWrapper.style.transition = 'transform 0.3s ease';
+        dragWrapper.style.transform = '';
+        return;
+      }
+
+      if (deltaX > 80) {
+        swipeOut('right');
+      } else if (deltaX < -80) {
+        swipeOut('left');
+      } else {
+        // Возврат на место
+        dragWrapper.style.transition = 'transform 0.3s ease';
+        dragWrapper.style.transform = '';
+        overlayKnow.style.opacity = 0;
+        overlayDontKnow.style.opacity = 0;
+      }
+    });
+
+    dragWrapper.addEventListener('pointercancel', () => {
+      isDragging = false;
+      dragWrapper.style.transition = 'transform 0.3s ease';
+      dragWrapper.style.transform = '';
+      overlayKnow.style.opacity = 0;
+      overlayDontKnow.style.opacity = 0;
+    });
+
+    function swipeOut(direction) {
+      const width = window.innerWidth;
+      const deltaX = direction === 'right' ? width : -width;
+      
+      dragWrapper.style.transition = 'transform 0.3s ease';
+      dragWrapper.style.transform = `translate(${deltaX}px, 0px) rotate(${deltaX * 0.05}deg)`;
+
+      setTimeout(() => {
+        if (direction === 'right') {
+          handleKnow();
+        } else {
+          handleDontKnow();
+        }
+      }, 300);
+    }
+
+    // --- КНОПКИ ---
     document.getElementById('knowBtn').addEventListener('click', (e) => {
       e.stopPropagation();
-      handleKnow();
+      if (studyQueue.length > 0) swipeOut('right');
     });
 
     document.getElementById('dontKnowBtn').addEventListener('click', (e) => {
       e.stopPropagation();
-      handleDontKnow();
+      if (studyQueue.length > 0) swipeOut('left');
     });
 
     document.getElementById('flipBtn').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (studyQueue.length === 0) return;
       isFlipped = !isFlipped;
       card.classList.toggle('is-flipped');
     });
@@ -416,33 +526,7 @@
       initSession();
     });
 
-    // --- СВАЙПЫ ДЛЯ МОБИЛЬНЫХ ---
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    card.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    card.addEventListener('touchend', (e) => {
-      touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
-    }, { passive: true });
-
-    function handleSwipe() {
-      const swipeThreshold = 60; // Минимальное расстояние для свайпа
-      
-      // Свайп влево -> Не знаю
-      if (touchEndX < touchStartX - swipeThreshold) {
-        handleDontKnow();
-      }
-      // Свайп вправо -> Знаю
-      if (touchEndX > touchStartX + swipeThreshold) {
-        handleKnow();
-      }
-    }
-
-    // Запуск приложения
+    // Запуск
     initSession();
 
   </script>
