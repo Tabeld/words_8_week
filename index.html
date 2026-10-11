@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Академический глоссарий</title>
+  <style>
+    :root {
+      --bg-color: #f0f2f5;
+      --card-bg: #ffffff;
+      --text-main: #1a1a1a;
+      --text-muted: #666666;
+      --primary-color: #4a90e2;
+      --success-color: #2ecc71;
+      --danger-color: #e74c3c;
+      --border-radius: 16px;
+      --shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      user-select: none;
+      touch-action: pan-y; /* Отключаем горизонтальный скролл для свайпов */
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    /* Прогресс-бар */
+    .progress-container {
+      width: 100%;
+      height: 8px;
+      background-color: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: var(--success-color);
+      transition: width 0.3s ease;
+    }
+    .progress-text {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: -8px;
+    }
+
+    /* Контейнер для карточки с 3D-эффектом */
+    .card-container {
+      perspective: 1000px;
+      width: 100%;
+      height: 480px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+    }
+
+    .card.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      background-color: var(--card-bg);
+      border-radius: var(--border-radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+      justify-content: flex-start;
+      overflow-y: auto;
+      text-align: left;
+      align-items: flex-start;
+    }
+
+    .card-front h2 {
+      font-size: 28px;
+      color: var(--primary-color);
+      word-break: break-word;
+    }
+
+    .hint {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .card-back p {
+      margin-bottom: 12px;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+
+    .card-back .definition { font-weight: 600; color: var(--text-main); }
+    .card-back .translation { font-weight: 700; color: var(--primary-color); font-size: 16px; }
+    .card-back .context-box {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary-color);
+      margin-top: 8px;
+      width: 100%;
+    }
+    .card-back .context-en { font-style: italic; color: #444; font-size: 13px; }
+
+    /* Кнопки управления */
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    button {
+      padding: 14px 10px;
+      border: none;
+      border-radius: 12px;
+      background-color: white;
+      color: var(--text-main);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:active { transform: scale(0.96); }
+
+    button.danger { background-color: var(--danger-color); color: white; flex: 1; }
+    button.success { background-color: var(--success-color); color: white; flex: 1; }
+    button.neutral { background-color: #ffffff; color: var(--text-muted); flex: 0.8; border: 1px solid #ddd; }
+
+    /* Экран завершения */
+    .completion-screen {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.98);
+      backdrop-filter: blur(5px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-radius: var(--border-radius);
+      z-index: 10;
+      text-align: center;
+      padding: 24px;
+      display: none;
+    }
+    .completion-screen h2 { font-size: 24px; margin-bottom: 16px; color: var(--success-color); }
+    .completion-screen p { margin-bottom: 24px; color: var(--text-muted); }
+    .completion-screen button {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 14px 28px;
+      font-size: 16px;
+      width: auto;
+    }
+
+    /* Скрываем скроллбар */
+    .card-back::-webkit-scrollbar { width: 4px; }
+    .card-back::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Прогресс -->
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 50</div>
+    
+    <!-- Карточка -->
+    <div class="card-container" id="cardContainer">
+      <div class="card" id="card">
+        <div class="card-front">
+          <h2 id="keyWord">Word</h2>
+          <p class="hint">Нажмите, чтобы перевернуть</p>
+        </div>
+        <div class="card-back">
+          <p class="definition" id="definition"></p>
+          <p class="translation" id="translation"></p>
+          <div class="context-box">
+            <p class="context-en" id="context"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="controls" id="controls">
+      <button id="dontKnowBtn" class="danger">❌ Не знаю</button>
+      <button id="flipBtn" class="neutral">🔄</button>
+      <button id="knowBtn" class="success">✅ Знаю</button>
+    </div>
+
+    <!-- Экран завершения -->
+    <div class="completion-screen" id="completionScreen">
+      <h2>🎉 Отлично!</h2>
+      <p>Вы выучили все слова в этой сессии!</p>
+      <button id="restartBtn">Начать заново</button>
+    </div>
+  </div>
+
+  <script>
+    // --- ВАШИ ДАННЫЕ (50 слов) ---
+    const glossaryData = [
+      { key: "assess", definition: "to judge or decide the amount, value, quality, or importance of something (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
+      { key: "progression", definition: "the process of developing or moving gradually towards a more advanced state (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
+      { key: "challenge", definition: "something that needs great mental or physical effort in order to be done successfully (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
+      { key: "compare", definition: "to examine or look for the difference between two or more things (Cambridge)", context: "In the healthcare workflow, practitioners compare scans taken at different times for the same patient.", translation: "В рабочем процессе здравоохранения практикующие врачи сравнивают снимки, сделанные в разное время для одного и того же пациента." },
+      { key: "identify", definition: "to recognize someone or something and say or prove who or what that person or thing is (Cambridge)", context: "This process involves identifying new and pre-existing lesions in the latest scans and assessing tumor progression according to the RECIST guidelines.", translation: "Этот процесс включает идентификацию новых и уже существующих поражений на последних снимках и оценку прогрессирования опухоли в соответствии с рекомендациями RECIST." },
+      { key: "evaluate", definition: "to judge or calculate the quality, importance, amount, or value of something (Cambridge)", context: "Practitioners must identify existing tumors, compare them with prior exams, identify new tumors, and evaluate overall disease evolution.", translation: "Практикующие врачи должны идентифицировать существующие опухоли, сравнивать их с предыдущими исследованиями, выявлять новые опухоли и оценивать общую эволюцию заболевания." },
+      { key: "complex", definition: "involving a lot of different but related parts (Cambridge)", context: "This process is particularly complex in liver examinations due to misalignment between exams caused by several factors.", translation: "Этот процесс особенно сложен при исследовании печени из-за рассогласования между исследованиями, вызванного несколькими факторами." },
+      { key: "misalignment", definition: "the state of being arranged wrongly or not in the correct position (Cambridge)", context: "This process is particularly complex in liver examinations due to misalignment between exams caused by several factors.", translation: "Этот процесс особенно сложен при исследовании печени из-за рассогласования между исследованиями, вызванного несколькими факторами." },
+      { key: "deformation", definition: "the change in shape or size of something (Cambridge)", context: "Indeed, longitudinal liver examinations can undergo different non-pathological and pathological changes due to non-rigid deformations, the appearance or disappearance of pathologies, and other variations.", translation: "Действительно, продольные исследования печени могут претерпевать различные непатологические и патологические изменения из-за нежёстких деформаций, появления или исчезновения патологий и других вариаций." },
+      { key: "pathological", definition: "relating to pathology (= the study of disease) (Cambridge)", context: "Indeed, longitudinal liver examinations can undergo different non-pathological and pathological changes due to non-rigid deformations, the appearance or disappearance of pathologies, and other variations.", translation: "Действительно, продольные исследования печени могут претерпевать различные непатологические и патологические изменения из-за нежёстких деформаций, появления или исчезновения патологий и других вариаций." },
+      { key: "intrinsic", definition: "being an extremely important and basic characteristic of a person or thing (Cambridge)", context: "In such cases, existing registration approaches, mainly based on intrinsic features may distort tumor regions, biasing the tumor progress evaluation step and the corresponding diagnosis.", translation: "В таких случаях существующие подходы к регистрации, в основном основанные на внутренних признаках, могут искажать области опухоли, смещая этап оценки прогрессирования опухоли и соответствующий диагноз." },
+      { key: "distort", definition: "to change the shape of something so that it looks strange or unnatural (Cambridge)", context: "In such cases, existing registration approaches, mainly based on intrinsic features may distort tumor regions, biasing the tumor progress evaluation step and the corresponding diagnosis.", translation: "В таких случаях существующие подходы к регистрации, в основном основанные на внутренних признаках, могут искажать области опухоли, смещая этап оценки прогрессирования опухоли и соответствующий диагноз." },
+      { key: "bias", definition: "to cause someone or something to have a particular opinion or to behave in a particular way (Cambridge)", context: "In such cases, existing registration approaches, mainly based on intrinsic features may distort tumor regions, biasing the tumor progress evaluation step and the corresponding diagnosis.", translation: "В таких случаях существующие подходы к регистрации, в основном основанные на внутренних признаках, могут искажать области опухоли, смещая этап оценки прогрессирования опухоли и соответствующий диагноз." },
+      { key: "align", definition: "to put things in a straight line, or to make something equal or similar to something else (Cambridge)", context: "This work proposes a registration method based only on geometrical and anatomical information from liver segmentation, aimed at aligning longitudinal liver images for aided diagnosis.", translation: "В данной работе предлагается метод регистрации, основанный только на геометрической и анатомической информации из сегментации печени, направленный на выравнивание продольных изображений печени для вспомогательной диагностики." },
+      { key: "aim", definition: "to intend or plan to do something (Cambridge)", context: "This work proposes a registration method based only on geometrical and anatomical information from liver segmentation, aimed at aligning longitudinal liver images for aided diagnosis.", translation: "В данной работе предлагается метод регистрации, основанный только на геометрической и анатомической информации из сегментации печени, направленный на выравнивание продольных изображений печени для вспомогательной диагностики." },
+      { key: "train", definition: "to prepare someone or something for a particular purpose or activity (Cambridge)", context: "The proposed method is trained and tested on longitudinal liver CT scans, with 317 patients for training and 53 for testing.", translation: "Предложенный метод обучен и протестирован на продольных КТ-сканах печени, при этом 317 пациентов использовались для обучения, а 53 — для тестирования." },
+      { key: "test", definition: "to do something in order to discover if something is safe, works correctly, etc. (Cambridge)", context: "The proposed method is trained and tested on longitudinal liver CT scans, with 317 patients for training and 53 for testing.", translation: "Предложенный метод обучен и протестирован на продольных КТ-сканах печени, при этом 317 пациентов использовались для обучения, а 53 — для тестирования." },
+      { key: "preserve", definition: "to keep something as it is, especially in order to prevent it from being damaged or destroyed (Cambridge)", context: "Our experimental results support our claims by showing that our method is better than other registration techniques by providing a smoother deformation while preserving the tumor burden within the volume.", translation: "Наши экспериментальные результаты подтверждают наши утверждения, показывая, что наш метод лучше других методов регистрации, обеспечивая более гладкую деформацию при сохранении опухолевой нагрузки в объеме." },
+      { key: "emphasize", definition: "to show that something is very important or worth giving attention to (Cambridge)", context: "Qualitative results emphasize the importance of smooth deformations in preserving tumor appearance.", translation: "Качественные результаты подчеркивают важность гладких деформаций для сохранения внешнего вида опухоли." },
+      { key: "propose", definition: "to suggest a plan, idea, or action (Cambridge)", context: "This work proposes a registration method based only on geometrical and anatomical information from liver segmentation, aimed at aligning longitudinal liver images for aided diagnosis.", translation: "В данной работе предлагается метод регистрации, основанный только на геометрической и анатомической информации из сегментации печени, направленный на выравнивание продольных изображений печени для вспомогательной диагностики." },
+      { key: "segmentation", definition: "the process of dividing something into different parts (Cambridge)", context: "This work proposes a registration method based only on geometrical and anatomical information from liver segmentation, aimed at aligning longitudinal liver images for aided diagnosis.", translation: "В данной работе предлагается метод регистрации, основанный только на геометрической и анатомической информации из сегментации печени, направленный на выравнивание продольных изображений печени для вспомогательной диагностики." },
+      { key: "diffeomorphic", definition: "related to a diffeomorphism, which is a differentiable bijection with a differentiable inverse (Mathematics)", context: "We propose to extend our approach by introducing a two-step incremental cyclic diffeomorphic registration process (Fig. 3).", translation: "Мы предлагаем расширить наш подход, введя двухэтапный инкрементальный циклический диффеоморфный процесс регистрации (Рис. 3)." },
+      { key: "invertible", definition: "capable of being inverted or turned upside down (Cambridge)", context: "The inverse consistency constraint ensures that the predicted displacement fields are invertible and inversely consistent.", translation: "Ограничение обратной согласованности гарантирует, что предсказанные поля смещений являются обратимыми и обратно согласованными." },
+      { key: "smoothness", definition: "the quality of having a surface or edge that is even and not rough (Cambridge)", context: "This first classical constraint penalizes the norm of the derivatives of the displacement field to ensure its local smoothness.", translation: "Это первое классическое ограничение штрафует норму производных поля смещений, чтобы обеспечить его локальную гладкость." },
+      { key: "penalize", definition: "to impose a penalty on; to punish (Cambridge)", context: "This first classical constraint penalizes the norm of the derivatives of the displacement field to ensure its local smoothness.", translation: "Это первое классическое ограничение штрафует норму производных поля смещений, чтобы обеспечить его локальную гладкость." },
+      { key: "constraint", definition: "something that controls what you do by keeping you within particular limits (Cambridge)", context: "To ensure effective registration, it is necessary to impose a set of constraints:", translation: "Для обеспечения эффективной регистрации необходимо наложить набор ограничений:" },
+      { key: "cyclic", definition: "relating to or happening in a cycle (Cambridge)", context: "In response, inspired by [22], we favor a cyclic method over a bidirectional one to compute the displacement fields.", translation: "В ответ, вдохновленные [22], мы предпочитаем циклический метод двунаправленному для вычисления полей смещений." },
+      { key: "bidirectional", definition: "going in two directions or having two parts that go in opposite directions (Cambridge)", context: "In response, inspired by [22], we favor a cyclic method over a bidirectional one to compute the displacement fields.", translation: "В ответ, вдохновленные [22], мы предпочитаем циклический метод двунаправленному для вычисления полей смещений." },
+      { key: "longitudinal", definition: "Relating to a study in which the same subjects are studied over a period of time (Cambridge)", context: "In longitudinal studies, variations such as patient movements, positioning, and organ displacement are common.", translation: "В продольных исследованиях обычны такие вариации, как движения пациента, позиционирование и смещение органов." },
+      { key: "registration", definition: "In medical imaging, the process of spatially aligning two or more images (Medical Imaging Glossary)", context: "This work proposes a registration method based only on geometrical and anatomical information from liver segmentation, aimed at aligning longitudinal liver images for aided diagnosis.", translation: "В данной работе предлагается метод регистрации, основанный только на геометрической и анатомической информации из сегментации печени, направленный на выравнивание продольных изображений печени для вспомогательной диагностики." },
+      { key: "tumor", definition: "A mass of cells growing in or on a part of the body where it should not grow (Cambridge)", context: "Practitioners must identify existing tumors, compare them with prior exams, identify new tumors, and evaluate overall disease evolution.", translation: "Практикующие врачи должны идентифицировать существующие опухоли, сравнивать их с предыдущими исследованиями, выявлять новые опухоли и оценивать общую эволюцию заболевания." },
+      { key: "liver", definition: "A large organ in the body that cleans the blood and produces bile (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
+      { key: "framework", definition: "A basic structure underlying a system, concept, or text (Oxford)", context: "Our main contribution is to propose a registration framework that aligns longitudinal images based only on geometric and anatomical information from liver segmentation...", translation: "Наш основной вклад — предложить структуру регистрации, которая выравнивает продольные изображения, основываясь только на геометрической и анатомической информации из сегментации печени..." },
+      { key: "non-rigid", definition: "Not rigid; capable of being deformed (Cambridge)", context: "Moreover, being a non-rigid organ, the liver presents additional complexities with recurring changes like large deformations due to stomach pressure...", translation: "Более того, будучи нежёстким органом, печень представляет дополнительные сложности с повторяющимися изменениями, такими как большие деформации из-за давления желудка..." },
+      { key: "pre-processing", definition: "the process of preparing data for analysis (Cambridge)", context: "<....> and <....> are affinely aligned during a pre-processing step.", translation: "<....> и <....> аффинно выровнены на этапе предварительной обработки." },
+      { key: "vector", definition: "a quantity having direction as well as magnitude (Cambridge)", context: "Each component of <....> is a three-dimensional vector indicating the displacement of a specific voxel.", translation: "Каждый компонент <....> представляет собой трехмерный вектор, указывающий смещение конкретного вокселя." },
+      { key: "evolution", definition: "The process of developing or changing gradually (Cambridge)", context: "Practitioners must identify existing tumors, compare them with prior exams, identify new tumors, and evaluate overall disease evolution.", translation: "Практикующие врачи должны идентифицировать существующие опухоли, сравнивать их с предыдущими исследованиями, выявлять новые опухоли и оценивать общую эволюцию заболевания." },
+      { key: "monitoring", definition: "The act of watching and checking something over a period of time (Cambridge)", context: "This monitoring demands considerable effort as practitioners must recognize previously detected lesions, compare them to their counterparts in prior exams...", translation: "Этот мониторинг требует значительных усилий, поскольку практикующие врачи должны распознавать ранее обнаруженные поражения, сравнивать их с аналогами в предыдущих исследованиях..." },
+      { key: "burden", definition: "The total amount or mass of something, especially a disease (Medical Dictionary)", context: "We evaluate the number of matched lesions, the mean tumor inclusion ratio post-registration (overlap of segmentations over the real tumor volume), and the relative error in tumor burden...", translation: "Мы оцениваем количество совпавших поражений, средний коэффициент включения опухоли после регистрации (перекрытие сегментаций с реальным объемом опухоли) и относительную ошибку опухолевой нагрузки..." },
+      { key: "inclusion ratio", definition: "The proportion of a target volume that is covered by a predicted volume (Medical Image Analysis Glossary)", context: "We evaluate the number of matched lesions, the mean tumor inclusion ratio post-registration (overlap of segmentations over the real tumor volume)...", translation: "Мы оцениваем количество совпавших поражений, средний коэффициент включения опухоли после регистрации (перекрытие сегментаций с реальным объемом опухоли)..." },
+      { key: "cross-validation", definition: "A statistical method for estimating model performance by dividing data into subsets (Machine Learning Glossary)", context: "Three-fold cross-validation experiments (on NVIDIA T4 GPUs) were conducted with an Adam optimizer until convergence...", translation: "Были проведены эксперименты с трехкратной перекрестной проверкой (на GPU NVIDIA T4) с оптимизатором Adam до сходимости..." },
+      { key: "lesion", definition: "An area of damaged tissue in the body (Cambridge)", context: "Fig. 1 illustrates the complexity of the process by representing a longitudinal exam with multiple lesions.", translation: "Рис. 1 иллюстрирует сложность процесса, представляя продольное исследование с множественными поражениями." },
+      { key: "alignment", definition: "The act of arranging things in a straight line or in correct relative positions (Cambridge)", context: "Tools performing automatic alignment of CT scans for precise tumor follow-up may reduce radiologists mental burden.", translation: "Инструменты, выполняющие автоматическое выравнивание КТ-сканов для точного наблюдения за опухолью, могут снизить умственную нагрузку радиологов." },
+      { key: "similarity", definition: "The state of being similar; likeness (Cambridge)", context: "VoxelMorph is trained with a loss based on image similarity.", translation: "VoxelMorph обучен с функцией потерь на основе сходства изображений." },
+      { key: "optimization", definition: "The process of making something as good as possible (Cambridge)", context: "Experiments were conducted with an Adam optimizer.", translation: "Эксперименты проводились с оптимизатором Adam." },
+      { key: "annotation", definition: "A note or comment added to a text or image (Cambridge)", context: "A radiologist manually annotated the tumor masks of this dataset.", translation: "Радиолог вручную аннотировал маски опухолей этого набора данных." },
+      { key: "radiologist", definition: "A doctor who specializes in examining the body using radiation (Cambridge)", context: "A radiologist manually annotated the tumor masks of this dataset.", translation: "Радиолог вручную аннотировал маски опухолей этого набора данных." },
+      { key: "diagnosis", definition: "A judgment about what a particular illness or problem is (Cambridge)", context: "In such cases, existing registration approaches, mainly based on intrinsic features may distort tumor regions, biasing the tumor progress evaluation step and the corresponding diagnosis.", translation: "В таких случаях существующие подходы к регистрации, в основном основанные на внутренних признаках, могут искажать области опухоли, смещая этап оценки прогрессирования опухоли и соответствующий диагноз." },
+      { key: "clinical", definition: "Relating to the examination and treatment of patients (Cambridge)", context: "Assessing cancer progression in liver CT scans is a clinical challenge, requiring a comparison of scans at different times for the same patient.", translation: "Оценка прогрессирования рака на КТ-сканах печени представляет собой клиническую проблему, требующую сравнения сканов, сделанных в разное время для одного и того же пациента." },
+      { key: "field", definition: "a region or space in which a particular effect is present (Cambridge)", context: "The network predicts a displacement field to align the moving image with the fixed image.", translation: "Сеть предсказывает поле смещений, чтобы выровнять движущееся изображение с фиксированным." }
+    ];
+
+    // --- ЛОГИКА ПРИЛОЖЕНИЯ ---
+    let studyQueue = []; // Очередь карточек для изучения
+    let knownCount = 0;  // Счетчик выученных слов
+    let currentCard = null;
+    let isFlipped = false;
+
+    // DOM элементы
+    const card = document.getElementById('card');
+    const keyWordEl = document.getElementById('keyWord');
+    const definitionEl = document.getElementById('definition');
+    const translationEl = document.getElementById('translation');
+    const contextEl = document.getElementById('context');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const completionScreen = document.getElementById('completionScreen');
+    const controls = document.getElementById('controls');
+
+    // Инициализация / Сброс
+    function initSession() {
+      studyQueue = [...glossaryData]; // Копируем все слова
+      // Перемешиваем очередь
+      for (let i = studyQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [studyQueue[i], studyQueue[j]] = [studyQueue[j], studyQueue[i]];
+      }
+      knownCount = 0;
+      completionScreen.style.display = 'none';
+      controls.style.display = 'flex';
+      updateProgress();
+      loadNextCard();
+    }
+
+    // Загрузка следующей карточки
+    function loadNextCard() {
+      if (studyQueue.length === 0) {
+        // Все выучено!
+        completionScreen.style.display = 'flex';
+        controls.style.display = 'none';
+        return;
+      }
+
+      // Сбрасываем переворот
+      if (isFlipped) {
+        card.classList.remove('is-flipped');
+        isFlipped = false;
+      }
+
+      // Берем первую карточку из очереди
+      currentCard = studyQueue[0]; // Не удаляем сразу, удалим при нажатии "Знаю"
+
+      // Небольшая задержка для анимации возврата
+      setTimeout(() => {
+        keyWordEl.textContent = currentCard.key;
+        definitionEl.textContent = currentCard.definition;
+        translationEl.textContent = currentCard.translation;
+        contextEl.textContent = currentCard.context;
+      }, 150);
+    }
+
+    // Обновление прогресса
+    function updateProgress() {
+      const total = glossaryData.length;
+      const percent = (knownCount / total) * 100;
+      progressBar.style.width = `${percent}%`;
+      progressText.textContent = `${knownCount} / ${total}`;
+    }
+
+    // Действие: Знаю (Свайп вправо или кнопка)
+    function handleKnow() {
+      if (studyQueue.length === 0) return;
+      
+      // Удаляем текущую карточку из очереди (она выучена)
+      studyQueue.shift(); 
+      knownCount++;
+      updateProgress();
+      loadNextCard();
+    }
+
+    // Действие: Не знаю (Свайп влево или кнопка)
+    function handleDontKnow() {
+      if (studyQueue.length === 0) return;
+      
+      // Перемещаем текущую карточку в конец очереди
+      const cardToRepeat = studyQueue.shift();
+      studyQueue.push(cardToRepeat);
+      loadNextCard();
+    }
+
+    // Переворот карточки
+    card.addEventListener('click', () => {
+      isFlipped = !isFlipped;
+      card.classList.toggle('is-flipped');
+    });
+
+    // Обработчики кнопок
+    document.getElementById('knowBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleKnow();
+    });
+
+    document.getElementById('dontKnowBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleDontKnow();
+    });
+
+    document.getElementById('flipBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      isFlipped = !isFlipped;
+      card.classList.toggle('is-flipped');
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', () => {
+      initSession();
+    });
+
+    // --- СВАЙПЫ ДЛЯ МОБИЛЬНЫХ ---
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    card.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    card.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+      const swipeThreshold = 60; // Минимальное расстояние для свайпа
+      
+      // Свайп влево -> Не знаю
+      if (touchEndX < touchStartX - swipeThreshold) {
+        handleDontKnow();
+      }
+      // Свайп вправо -> Знаю
+      if (touchEndX > touchStartX + swipeThreshold) {
+        handleKnow();
+      }
+    }
+
+    // Запуск приложения
+    initSession();
+
+  </script>
+</body>
+</html>
