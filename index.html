@@ -46,6 +46,39 @@
       position: relative;
     }
 
+    /* Переключатель вариантов */
+    .mode-switch {
+      display: flex;
+      background: #e4e7eb;
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: none;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .mode-btn.active {
+      background: #ffffff;
+      color: var(--primary-color);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .mode-btn:active { transform: scale(0.97); }
+
     /* Прогресс-бар */
     .progress-container {
       width: 100%;
@@ -138,11 +171,29 @@
       color: var(--primary-color);
       word-break: break-word;
     }
+    .card-front h2.ru {
+      font-size: 22px;
+      line-height: 1.35;
+    }
 
     .hint {
       margin-top: 16px;
       font-size: 12px;
       color: var(--text-muted);
+    }
+
+    /* Английское слово на обороте (режим RU→EN) */
+    .card-back .back-key {
+      display: none;
+      width: 100%;
+      text-align: center;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #eef2f7;
+      word-break: break-word;
     }
 
     /* Стили для текста на обороте */
@@ -175,19 +226,19 @@
     }
 
     .card-back .context-box {
-      background: #f8f9fa; 
-      padding: 12px; 
+      background: #f8f9fa;
+      padding: 12px;
       border-radius: 8px;
-      border-left: 4px solid var(--primary-color); 
-      margin-top: 8px; 
+      border-left: 4px solid var(--primary-color);
+      margin-top: 8px;
       width: 100%;
       margin-bottom: 16px;
     }
-    .card-back .context-en { 
-      font-style: italic; 
-      color: #444; 
-      font-size: 14px; 
-      line-height: 1.4; 
+    .card-back .context-en {
+      font-style: italic;
+      color: #444;
+      font-size: 14px;
+      line-height: 1.4;
     }
 
     .card-back .term-translation {
@@ -294,15 +345,22 @@
 <body>
 
   <div class="app-container">
+
+    <!-- Переключатель вариантов -->
+    <div class="mode-switch" id="modeSwitch">
+      <button class="mode-btn active" data-mode="en-ru">🇬🇧 → 🇷🇺</button>
+      <button class="mode-btn" data-mode="ru-en">🇷🇺 → 🇬🇧</button>
+    </div>
+
     <div class="progress-container">
       <div class="progress-bar" id="progressBar"></div>
     </div>
     <div class="progress-text" id="progressText">0 / 50</div>
-    
+
     <div class="card-container" id="cardContainer">
       <div class="overlay know" id="overlayKnow">ЗНАЮ</div>
       <div class="overlay dont-know" id="overlayDontKnow">НЕ ЗНАЮ</div>
-      
+
       <div class="drag-wrapper" id="dragWrapper">
         <div class="card" id="card">
           <div class="card-front">
@@ -310,18 +368,20 @@
             <p class="hint">Нажмите, чтобы перевернуть</p>
           </div>
           <div class="card-back">
+            <h2 class="back-key" id="backKey"></h2>
+
             <div class="def-label">Официальное определение</div>
             <p class="definition-official" id="definitionOfficial"></p>
-            
+
             <div class="def-label">Простыми словами</div>
             <p class="definition-simple" id="definitionSimple"></p>
-            
+
             <div class="def-label">Простой пример</div>
             <div class="context-box">
               <p class="context-en" id="context"></p>
-              <p class="term-translation" id="termTranslation"></p> 
+              <p class="term-translation" id="termTranslation"></p>
             </div>
-            
+
             <p class="translation" id="translation"></p>
           </div>
         </div>
@@ -343,7 +403,6 @@
 
   <script>
     // --- ДАННЫЕ ---
-    // В полях context и translation теперь короткие и простые предложения!
     const glossaryData = [
       { key: "registration", termTranslation: "регистрация", definitionOfficial: "The process of putting two or more images into the same position so they can be compared.", definitionSimple: "Совмещение двух картинок, чтобы их можно было сравнить.", context: "The doctor used a registration method to compare the two liver scans.", translation: "Врач использовал метод регистрации, чтобы сравнить два снимка печени." },
       { key: "segmentation", termTranslation: "сегментация", definitionOfficial: "The process of dividing an image into parts.", definitionSimple: "Разделение изображения на отдельные зоны (например, чтобы отделить печень от остального).", context: "The computer program did a liver segmentation on the medical image.", translation: "Компьютерная программа выполнила сегментацию печени на медицинском снимке." },
@@ -402,10 +461,12 @@
     let knownCount = 0;
     let currentCard = null;
     let isFlipped = false;
+    let currentMode = 'en-ru'; // 'en-ru' | 'ru-en'
 
     const dragWrapper = document.getElementById('dragWrapper');
     const card = document.getElementById('card');
     const keyWordEl = document.getElementById('keyWord');
+    const backKeyEl = document.getElementById('backKey');
     const defOfficialEl = document.getElementById('definitionOfficial');
     const defSimpleEl = document.getElementById('definitionSimple');
     const translationEl = document.getElementById('translation');
@@ -441,7 +502,7 @@
       card.style.transition = 'none';
       card.classList.remove('is-flipped');
       isFlipped = false;
-      
+
       dragWrapper.style.transition = 'none';
       dragWrapper.style.transform = 'translate(0px, 0px) rotate(0deg)';
       overlayKnow.style.opacity = 0;
@@ -450,13 +511,31 @@
       currentCard = studyQueue[0];
 
       setTimeout(() => {
-        keyWordEl.textContent = currentCard.key;
+        // --- Лицевая сторона зависит от режима ---
+        if (currentMode === 'en-ru') {
+          keyWordEl.textContent = currentCard.key;
+          keyWordEl.classList.remove('ru');
+        } else {
+          keyWordEl.textContent = currentCard.termTranslation;
+          keyWordEl.classList.add('ru');
+        }
+
+        // --- Оборотная сторона ---
+        if (currentMode === 'ru-en') {
+          backKeyEl.textContent = currentCard.key;
+          backKeyEl.style.display = 'block';
+          termTranslationEl.style.display = 'none';
+        } else {
+          backKeyEl.style.display = 'none';
+          termTranslationEl.style.display = 'block';
+          termTranslationEl.textContent = "Перевод: " + currentCard.termTranslation;
+        }
+
         defOfficialEl.textContent = currentCard.definitionOfficial;
         defSimpleEl.textContent = currentCard.definitionSimple;
         contextEl.textContent = currentCard.context;
-        termTranslationEl.textContent = "Перевод: " + currentCard.termTranslation; 
         translationEl.textContent = currentCard.translation;
-        
+
         card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1)';
         dragWrapper.style.transition = 'transform 0.3s ease';
       }, 50);
@@ -471,7 +550,7 @@
 
     function handleKnow() {
       if (studyQueue.length === 0) return;
-      studyQueue.shift(); 
+      studyQueue.shift();
       knownCount++;
       updateProgress();
       loadNextCard();
@@ -551,7 +630,7 @@
     function swipeOut(direction) {
       const width = window.innerWidth;
       const deltaX = direction === 'right' ? width : -width;
-      
+
       dragWrapper.style.transition = 'transform 0.3s ease';
       dragWrapper.style.transform = `translate(${deltaX}px, 0px) rotate(${deltaX * 0.05}deg)`;
 
@@ -583,6 +662,22 @@
 
     document.getElementById('restartBtn').addEventListener('click', () => {
       initSession();
+    });
+
+    // --- Переключатель вариантов ---
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = btn.dataset.mode;
+        if (mode === currentMode) return;
+
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.mode === mode);
+        });
+
+        initSession();
+      });
     });
 
     initSession();
